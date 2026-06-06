@@ -47,3 +47,7 @@ temp/
 
 # TypeScript
 *.tsbuildinfo
+
+
+# Python virtual environment
+.venv/

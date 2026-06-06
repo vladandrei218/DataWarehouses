@@ -121,7 +121,7 @@
                     container.innerHTML = '<p>No active instruments found in the warehouse. Run ingest.js first!</p>';
                     return;
                 }
-                activeAssets.forEach(asset => {
+                activeAssets.data.forEach(asset => {
                     const card = document.createElement('div');
                     const cleanSourceId = asset.provider.name.toLowerCase().replace(/\s+/g, '_');
                     card.className = 'asset-card';
