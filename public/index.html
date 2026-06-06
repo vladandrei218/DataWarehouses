@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acme Ltd Data Warehouse</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            padding: 40px;
+            background-color: #f4f4f9;
+            margin: 0;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .asset-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-width: 95%;
+        }
+
+        .asset-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            border-left: 5px solid #007bff;
+            width: 100%;
+        }
+
+        .asset-name {
+            font-size: 20px;
+            font-weight: bold;
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        .asset-name:hover {
+            text-decoration: underline;
+        }
+
+        .asset-meta {
+            color: #555;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .secondary-link {
+            display: inline-block;
+            margin-top: 10px;
+            font-size: 13px;
+            color: #28a745;
+            text-decoration: none;
+        }
+
+        .secondary-link:hover {
+            text-decoration: underline;
+        }
+
+        .tertiary-link {
+            display: inline-block;
+            margin-top: 10px;
+            font-size: 13px;
+            color: #cd9b25;
+            text-decoration: none;
+        }
+
+        .tertiary-link:hover {
+            text-decoration: underline;
+        }
+
+        .quarternary-link {
+            display: inline-block;
+            margin-top: 10px;
+            font-size: 13px;
+            color: #4190fe;
+            text-decoration: none;
+        }
+
+        .quarternary-link:hover {
+            text-decoration: underline;
+        }
+
+        .error-message {
+            color: #dc3545;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Acme Ltd - Dashboard</h1>
+    <p class="subtitle">Select an active financial asset below to view its details or historical data points.</p>
+
+    <div id="assets-container" class="asset-list">
+        <p>Loading market data warehouse assets...</p>
+    </div>
+
+    <script>
+        async function fetchDashboardData() {
+            const container = document.getElementById('assets-container');
+            try {
+                const response = await fetch('/api/assets');
+                if (!response.ok) throw new Error('Failed to communicate with API');
+
+                const activeAssets = await response.json();
+                container.innerHTML = '';
+
+                if (activeAssets.length === 0) {
+                    container.innerHTML = '<p>No active instruments found in the warehouse. Run ingest.js first!</p>';
+                    return;
+                }
+                activeAssets.forEach(asset => {
+                    const card = document.createElement('div');
+                    const cleanSourceId = asset.provider.name.toLowerCase().replace(/\s+/g, '_');
+                    card.className = 'asset-card';
+                    card.innerHTML = `
+                        <a class="asset-name" href="/api/assets/${asset.instrumentId}" target="_blank">
+                            ${asset.name} (${asset.instrumentId})
+                        </a>
+                        <div class="asset-meta">
+                            <strong>Class:</strong> ${asset.class} | 
+                            <strong>Source Provider:</strong> ${asset.provider.name} (${asset.provider.type})
+                        </div>
+                        <div>
+                            <a class="secondary-link" href="/api/timeseries/${cleanSourceId}/${asset.instrumentId}" target="_blank">
+                                View Historical Time Series |
+                            </a>
+                            <a class="tertiary-link" href="/api/analytics/summary/${asset.instrumentId}" target="_blank">
+                                View Analytics |
+                            </a>
+                            <a class="quarternary-link" href="/api/analytics/forecast/${asset.instrumentId}" target="_blank">
+                                View Predicted Next Day Price
+                            </a>
+                        </div>
+
+                       
+                    `;
+                    container.appendChild(card);
+                });
+
+            } catch (error) {
+                container.innerHTML = `<p class="error-message">Error: ${error.message}</p>`;
+            }
+        }
+        fetchDashboardData();
+    </script>
+</body>
+
+</html>
