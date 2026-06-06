@@ -1,78 +1,37 @@
-## Overview
+# Acme Ltd - Financial Data Warehouse
 
-This project provides a web interface for viewing financial assets stored in a MongoDB database and includes an MCP (Model Context Protocol) server that can be connected to Claude Desktop for conversational access to the stored financial data.
+## Architecture Overview
+This project implements an enterprise-grade Data Warehouse for financial markets using a modern, scalable tech stack:
+* **Database:** MongoDB (NoSQL) handling heterogeneous asset attributes and time-series data.
+* **API Layer:** Node.js / Express providing RESTful access.
+* **Data Access Layer (DAL):** Abstracted Repository Pattern (`dal.js`) separating persistence logic from HTTP routing.
+* **Analytics Engine:** Apache Spark (PySpark) executing batch aggregations and MLlib Linear Regression directly against the database.
+* **AI Integration:** Model Context Protocol (MCP) server enabling LLMs (like Claude) to securely query the warehouse.
 
-## Setup
+## Temporal Database Semantics
+The warehouse enforces strict temporal versioning:
+* **No in-place updates or deletes.**
+* Updates/Deletes close the active record by applying a `validTo` timestamp.
+* A new record is inserted with a `validFrom` timestamp (and `isDeleted: true` for soft deletions).
+* Full audit trails are accessible via the `/api/history/:id` endpoint.
 
-### 1. Clear Existing Database Data
+## Data Ingestion
+The `ingest.js` script implements an idempotent ETL pipeline. It normalizes data from multiple heterogeneous providers (Yahoo Finance APIs and CoinGecko public REST APIs) and safely upserts time-series data to avoid duplication.
 
-Remove all existing data from the MongoDB database:
+## REST API Contract
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/assets?page=1&limit=50` | Retrieves paginated active assets. |
+| `GET` | `/api/assets/:id` | Retrieves current active details for a specific asset. |
+| `PUT` | `/api/assets/:id` | Temporally updates an asset's attributes. |
+| `DELETE` | `/api/assets/:id` | Temporally deletes (soft-deletes) an asset. |
+| `GET` | `/api/history/:id` | Retrieves the full version history of an asset. |
+| `GET` | `/api/sources` | Retrieves paginated list of data providers. |
+| `GET` | `/api/timeseries/:sourceId/:assetId` | Retrieves raw historical pricing data. |
 
-```bash
-node clear.js
-```
-
-### 2. Ingest Asset Data
-
-Populate the database with data from `assets.js`:
-
-```bash
-node ingest.js
-```
-
-The ingestion script reads the asset information from `assets.js` and inserts it into the MongoDB database.
-
-### 3. Start the Server
-
-Launch the application:
-
-```bash
-node server.js
-```
-
-### 4. Open the Dashboard
-
-Navigate to:
-
-```text
-http://localhost:3000
-```
-
-The dashboard displays all available assets. Each asset has four buttons that can be used to retrieve additional information about that asset.
-
-## MCP Server Integration
-
-The `mcp.mjs` file implements the MCP (Model Context Protocol) server.
-
-On my local machine, I have connected this MCP server to Claude Desktop. This allows me to interact with the financial data stored in the database using natural language. Through Claude, I can ask questions about my assets and receive answers based on the information available in the database.
-
-## Project Structure
-
-| File | Description |
-|--------|-------------|
-| `assets.js` | Source asset data used for ingestion |
-| `clear.js` | Removes all data from the MongoDB database |
-| `ingest.js` | Inserts asset data from `assets.js` into MongoDB |
-| `server.js` | Starts the web application |
-| `mcp.mjs` | MCP server for Claude Desktop integration |
-
-## Typical Workflow
-
-```bash
-# Clear existing data
-node clear.js
-
-# Load fresh asset data
-node ingest.js
-
-# Start the server
-node server.js
-```
-
-Then open:
-
-```text
-http://localhost:3000
-```
-
-to view and interact with the asset dashboard.
+## Running the Project
+1. **Install dependencies:** `npm install`
+2. **Ingest data:** `node ingest.js`
+3. **Run API Server:** `node server.js`
+4. **Run Unit Tests:** `npm test` (Executes Jest suite for DAL abstraction and temporal logic).
+5. **Run Spark ML Analytics:** `source .venv/bin/activate` then `python spark_analytics.py`
