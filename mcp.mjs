@@ -17,6 +17,9 @@ async function startMcpServer() {
     const db = client.db(dbName);
     const instrumentsCol = db.collection('instruments');
     const timeSeriesCol = db.collection('time_series');
+    
+    const mlPredictionsCol = db.collection('ml_predictions'); 
+
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
         tools: [
             {
@@ -37,7 +40,7 @@ async function startMcpServer() {
             },
             {
                 name: "get_asset_analytics",
-                description: "Gets statistical analysis, risk profiles, and simple OLS forecasts for an asset.",
+                description: "Gets statistical analysis, risk profiles, and simple forecasts for an asset.",
                 inputSchema: {
                     type: "object",
                     properties: {
@@ -57,9 +60,21 @@ async function startMcpServer() {
                     },
                     required: ["symbol1", "symbol2"]
                 }
+            },
+            {
+                name: "get_ml_predictions",
+                description: "Retrieves the persisted Apache Spark Machine Learning predictions for a specific asset.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        symbol: { type: "string", description: "The ticker symbol (e.g., AAPL)" }
+                    },
+                    required: ["symbol"]
+                }
             }
         ]
     }));
+
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { name, arguments: args } = request.params;
 
@@ -120,6 +135,18 @@ async function startMcpServer() {
                 };
                 
                 return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+            }
+
+            if (name === "get_ml_predictions") {
+                const predictions = await mlPredictionsCol.find({ instrumentId: args.symbol.toUpperCase() })
+                                                          .limit(20)
+                                                          .toArray();
+                
+                if (predictions.length === 0) {
+                    return { content: [{ type: "text", text: `No ML predictions found for ${args.symbol}. Did you run the Spark job?` }] };
+                }
+                
+                return { content: [{ type: "text", text: JSON.stringify(predictions, null, 2) }] };
             }
 
             throw new Error(`Unknown tool: ${name}`);

@@ -1,7 +1,6 @@
-// server.js
 const express = require('express');
 const path = require('path');
-const dal = require('./dal'); // Import our new Data Access Layer
+const dal = require('./dal'); 
 
 const app = express();
 const port = 3000;
@@ -17,7 +16,7 @@ async function startServer() {
             res.sendFile(path.join(__dirname, 'public', 'index.html'));
         });
 
-        // [Q1] + Pagination
+        // [Q1] Active Assets 
         app.get('/api/assets', async (req, res) => {
             try {
                 const page = parseInt(req.query.page) || 1;
@@ -29,7 +28,7 @@ async function startServer() {
             }
         });
 
-        // [Q2]
+        // [Q2] Asset Details
         app.get('/api/assets/:id', async (req, res) => {
             try {
                 const assetDetails = await dal.getAssetById(req.params.id.toUpperCase());
@@ -40,7 +39,7 @@ async function startServer() {
             }
         });
 
-        // [Q3] + Pagination
+        // [Q3] Sources 
         app.get('/api/sources', async (req, res) => {
             try {
                 const page = parseInt(req.query.page) || 1;
@@ -52,7 +51,7 @@ async function startServer() {
             }
         });
 
-        // [Q4]
+        // [Q4] Source Details
         app.get('/api/sources/:sourceId', async (req, res) => {
             try {
                 const source = await dal.getSourceById(req.params.sourceId.toLowerCase());
@@ -63,15 +62,16 @@ async function startServer() {
             }
         });
 
-        // [Q5]
+        // [Q5] Time Series 
         app.get('/api/timeseries/:sourceId/:assetId', async (req, res) => {
             try {
                 const assetId = req.params.assetId.toUpperCase();
-                const instrumentCheck = await dal.getAssetById(assetId);
+                const { startDate, endDate } = req.query;
                 
+                const instrumentCheck = await dal.getAssetById(assetId);
                 if (!instrumentCheck) return res.status(404).json({ error: "Asset not found" });
                 
-                const seriesData = await dal.getTimeSeries(assetId);
+                const seriesData = await dal.getTimeSeries(assetId, startDate, endDate);
                 res.json({ instrumentId: assetId, dataPointsCount: seriesData.length, series: seriesData });
             } catch (error) {
                 res.status(500).json({ error: "Failed to fetch time series" });
@@ -98,7 +98,7 @@ async function startServer() {
             }
         });
 
-        // History
+        // History API
         app.get('/api/history/:id', async (req, res) => {
             try {
                 const history = await dal.getAssetHistory(req.params.id.toUpperCase());

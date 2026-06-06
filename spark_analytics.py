@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import avg, max, min, stddev, monotonically_increasing_id
+from pyspark.sql.functions import avg, max, min, stddev, monotonically_increasing_id, lit
 from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.regression import LinearRegression
 
@@ -8,6 +8,7 @@ print("Initializing Apache Spark Session...")
 spark = SparkSession.builder \
     .appName("AcmeFinanceSparkAnalytics") \
     .config("spark.mongodb.read.connection.uri", "mongodb://localhost:27017/acme_finance.time_series") \
+    .config("spark.mongodb.write.connection.uri", "mongodb://localhost:27017/acme_finance.ml_predictions") \
     .config("spark.jars.packages", "org.mongodb.spark:mongo-spark-connector_2.12:10.3.0") \
     .getOrCreate()
 
@@ -16,7 +17,7 @@ print("Pulling Time Series data from Data Warehouse...")
 df = spark.read.format("mongodb").load()
 
 if df.isEmpty():
-    print("No data found in MongoDB.")
+    print("No data found in MongoDB. Please run ingest.js first.")
 else:
     print("\nSpark Aggregation: Asset Volatility & Volume Analysis")
     analytics_df = df.groupBy("instrumentId").agg(
@@ -27,6 +28,7 @@ else:
         avg("volume").alias("Avg_Daily_Volume")
     )
     analytics_df.orderBy("Avg_Daily_Volume", ascending=False).show()
+
     print("\nSpark MLlib: OLS Linear Regression (AAPL Trend)")
     aapl_df = df.filter(df.instrumentId == 'AAPL').orderBy("timestamp")
     
@@ -41,10 +43,24 @@ else:
         
         print(f"Algorithm: Ordinary Least Squares (OLS) via Spark MLlib")
         print(f"Trend Slope (Coefficient): {lr_model.coefficients[0]:.4f}")
-        print(f"Y-Intercept: {lr_model.intercept:.4f}")
         
         trend = "Bullish (Upward)" if lr_model.coefficients[0] > 0 else "Bearish (Downward)"
         print(f"Overall Trend Direction: {trend}")
+
+        print("\nPersisting ML predictions to database...")
+        predictions = lr_model.transform(ml_data)
+        
+        save_df = predictions.select(
+            lit("AAPL").alias("instrumentId"),
+            "label", 
+            "prediction"
+        ).withColumnRenamed("label", "actualClosePrice")
+        
+        save_df.write.format("mongodb") \
+            .mode("overwrite") \
+            .save()
+            
+        print("Predictions successfully saved to 'ml_predictions' collection in MongoDB.")
     else:
         print("Not enough data points for ML forecasting.")
 

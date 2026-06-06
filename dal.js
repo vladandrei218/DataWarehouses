@@ -1,4 +1,3 @@
-// dal.js
 const { MongoClient } = require('mongodb');
 
 const url = 'mongodb://localhost:27017';
@@ -61,8 +60,16 @@ async function getSourceById(sourceId) {
     };
 }
 
-async function getTimeSeries(assetId) {
-    return await timeSeriesCol.find({ instrumentId: assetId }).sort({ timestamp: 1 }).toArray();
+async function getTimeSeries(assetId, startDate, endDate) {
+    let query = { instrumentId: assetId };
+    
+    if (startDate || endDate) {
+        query.timestamp = {};
+        if (startDate) query.timestamp.$gte = new Date(startDate);
+        if (endDate) query.timestamp.$lte = new Date(endDate);
+    }
+    
+    return await timeSeriesCol.find(query).sort({ timestamp: 1 }).toArray();
 }
 
 async function historicallyUpdateAsset(assetId, updates) {
@@ -106,7 +113,7 @@ async function historicallyDeleteAsset(assetId) {
 
     await instrumentsCol.insertOne({
         ...currentActive,
-        _id: undefined,
+        _id: undefined, 
         validFrom: now,       
         validTo: null,        
         isDeleted: true  
